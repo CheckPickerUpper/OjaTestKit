@@ -79,11 +79,11 @@ The `_tests/` factory layer (`GameplaySetContainerFactory`, `TestCoreServices`, 
 
 ## Gotchas
 
-### init.luau vs index.luau (Rojo naming conflict)
+### init.luau must stay as init.luau
 
-rbxtsc compiles `src/index.ts` to `out/init.luau`. Rojo treats `init.luau` as a directory entry point, making the `out/` folder a ModuleScript with no children. Consumer imports resolve to `TS.import(..., "out", "index")`, calling `WaitForChild("index")` which yields forever.
+rbxtsc compiles `src/index.ts` to `out/init.luau`. Rojo treats this as a directory entry point: `out/` becomes a ModuleScript, and other `.luau` files in the directory become children. Consumer imports compile to `TS.import(..., "out")` and expect `out` to be a ModuleScript.
 
-Fix: build script runs `mv out/init.luau out/index.luau` and `sed` to rewrite `script` references to `script.Parent`. Without `init.luau`, Rojo treats `out/` as a Folder and syncs `index.luau` as a child.
+Do NOT rename `init.luau` to `index.luau`. That turns `out/` into a plain Folder, and consumer imports fail with "Expected ModuleScript, got Folder". Inside `init.luau`, `script` = the `out` ModuleScript, so `TS.import(script, script, "matchers")` finds `matchers.luau` as a child — no sed rewriting needed.
 
 ### Plugin command timeout
 
@@ -114,3 +114,4 @@ OjaTestKit's postinstall script writes `return nil` to `node_modules/init.luau` 
 - **2026-03-09** Phases 1-5 confirmed complete. CLI consolidated into `@ojagamez/oja-test-kit` as `oja-test` bin.
 - **2026-03-10** E2E pipeline validated. Documented gotchas from integration debugging. Key fixes: init-to-index rename, task.spawn async execution, Promise detection, serve subcommand, 90s bridge timeout.
 - **2026-03-10** NRO-102 (spinner), NRO-106 (tag filtering), NRO-107 (matchers) completed. Defcon1 trait test passing 6/6 in Studio. Plugin timeout reduced to 30s.
+- **2026-03-10** Reverted init.luau→index.luau rename. The rename broke consumer imports ("Expected ModuleScript, got Folder"). Build script simplified to just `rbxtsc --type package`.

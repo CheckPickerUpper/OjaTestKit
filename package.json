@@ -2,7 +2,7 @@
 	"name": "@ojagamez/oja-test-kit",
 	"version": "0.1.0",
 	"description": "Test framework for roblox-ts projects. Runs describe/it/expect inside Roblox Studio with structured JSON output.",
-	"main": "out/index.luau",
+	"main": "out/init.luau",
 	"types": "out/index.d.ts",
 	"bin": {
 		"oja-test": "cli/oja-test.mjs",
@@ -13,7 +13,7 @@
 		"cli"
 	],
 	"scripts": {
-		"build": "rbxtsc --type package && mv out/init.luau out/index.luau && sed -i 's/TS.import(script, script,/TS.import(script, script.Parent,/g' out/index.luau",
+		"build": "rbxtsc --type package",
 		"watch": "rbxtsc -w --type package",
 		"postinstall": "bash cli/install-mcp.sh"
 	},

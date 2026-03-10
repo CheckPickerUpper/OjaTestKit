@@ -1,128 +1,116 @@
 # Studio Test Runner: Task List
 
-> Generated: 2026-03-07
+> Updated: 2026-03-10
 > Dependency graph: `_docs/Plans/StudioTestRunner.DependencyGraph.md`
 > Design spec: `_docs/GameDesign/StudioTestRunner.DesignerFacing.Spec.md`
+
+## Key Decision: No Mocks in Studio Tests
+
+The MCP plugin dispatches `run_tests` on demand via long-poll; by the time tests execute, the DataModel is fully loaded and all services are initialized. Studio tests run inside the real Roblox runtime, so AssetProvider, CollectionService, WorldStateProvider, replication routers, and cue systems are all live. No noop stubs needed.
+
+The `_tests/` factory layer (`GameplaySetContainerFactory`, `TestCoreServices`, etc.) exists solely because Jest runs in Node where Roblox APIs don't exist. When migrating `.unit.ts` to `.studio.ts`, delete the mock indirection and wire up real providers directly; the game has already booted by the time the plugin receives the command.
 
 ## Phase 1: Test Framework (roblox-ts)
 > Blocked by: nothing
 
-- [ ] **1.1** Define result types (SuiteResult, TestResult, TestStatus) `[Slice 1]`
-  * File: `src/Shared/ReplicatedStorage/Infrastructure/TestFramework/TestFramework.Types.ts`
-  * Wire format types matching the JSON spec: `{ totalTests, passed, failed, skipped, duration, suites: SuiteResult[] }`. Each `SuiteResult` has `name`, `file`, `tests: TestResult[]`. Each `TestResult` has `name`, `status: "pass" | "fail" | "skip"`, `duration`, optional `error` and `traceback`.
-
-- [ ] **1.2** Implement `describe`, `it`, `expect` with all matchers `[Slice 1]`
-  * File: `src/Shared/ReplicatedStorage/Infrastructure/TestFramework/TestFramework.ts`
-  * Around 200 lines of roblox-ts. `describe(name, fn)` registers a suite. `it(name, fn)` registers a test case. `expect(value)` returns a chainable matcher object. Matchers: `toBe`, `toEqual` (deep), `toBeDefined`, `toBeUndefined`, `toBeTruthy`, `toBeFalsy`, `toBeGreaterThan`, `toBeLessThan`, `toContain`, `toHaveLength`, `toThrow`, `toApprox(n, precision?)`. All matchers support `.not` negation.
-  * `beforeEach`/`afterEach`/`beforeAll`/`afterAll` hooks.
-  * Export a `RunSuite()` function that executes all registered tests and returns `SuiteResult`.
-
-- [ ] **1.3** Add auto-sandbox isolation `[Slice 1]`
-  * File: same as 1.2
-  * Each root `describe` block gets a temporary `Folder` parented to `ReplicatedStorage`. Tests can parent Instances into `sandbox`. After the suite completes (pass or fail), the sandbox Folder is `Destroy()`d. Level 1 tests that use DI containers can ignore the sandbox entirely.
-
-- [ ] **1.4** Add Promise-aware `it()` `[Slice 1]`
-  * File: same as 1.2
-  * If the callback passed to `it()` returns a Promise, the runner awaits it before recording pass/fail. Uses `@rbxts/promise` (already a transitive dependency). Synchronous callbacks work as-is with no change.
+- [x] **1.1** Define result types (SuiteResult, TestResult, TestStatus)
+- [x] **1.2** Implement `describe`, `it`, `expect` with all matchers
+- [x] **1.3** Add auto-sandbox isolation
+- [x] **1.4** Add Promise-aware `it()`
+- [x] **1.5** Add `tag()` API for semantic suite tagging
+- [x] **1.6** Add missing matchers (toMatchObject, toHaveProperty, toSatisfy, toStartWith, toEndWith, toBeA, toHaveTag, toHaveAttribute)
 
 ## Phase 2: Test Compilation Config
 > Blocked by: nothing (parallel with Phase 1)
 
-- [ ] **2.1** Create `tsconfig.studio-tests.json` `[Slice 1]`
-  * File: `tsconfig.studio-tests.json` (project root)
-  * Extends `tsconfig-base.json`. Sets `rootDir: "src"`, `outDir: "out"`. Includes `src/**/_Tests_/**/*.studio.ts` and `src/**/Infrastructure/TestFramework/**/*.ts`. Excludes everything the main tsconfig excludes EXCEPT `_Tests_` directories. Uses the same path aliases from `tsconfig-base.json`.
-
-- [ ] **2.2** Add `pnpm compile:tests` script `[Slice 1]`
-  * File: `package.json` (add script)
-  * Script: `"compile:tests": "rbxtsc --project tsconfig.studio-tests.json --rojo build.project.json"`
-  * Test compilation is isolated from game compilation. Test build errors cannot break the game build.
-
-- [ ] **2.3** Verify Rojo picks up compiled test output `[Slice 1]`
-  * No file changes. Manual verification step.
-  * Run `pnpm compile:tests`, then check that `out/Shared/ReplicatedStorage/Infrastructure/TestFramework/` contains compiled `.lua` files. Confirm Rojo syncs them into Studio at `ReplicatedStorage/TS/Infrastructure/TestFramework/`.
+- [x] **2.1** Create `tsconfig.studio-tests.json`
+- [x] **2.2** Add `pnpm compile:tests` script
+- [x] **2.3** Verify Rojo picks up compiled test output
 
 ## Phase 3: Plugin run_tests Command (Luau)
 > Blocked by: Phase 1, Phase 2
 
-- [ ] **3.1** Create TestRunner module in the plugin `[Slice 2]`
-  * File: `~/dev/ai-lab/MCP's/rbx-studio-mcp/plugin/src/TestRunner.luau`
-  * Receives an array of DataModel paths (strings like `"ReplicatedStorage.TS.Content.Traits.Defcon1._Tests_.Defcon1.studio"`). For each path: resolves the ModuleScript via `InstanceResolver`, `require()`s it (triggering the test framework's `describe`/`it` registration), calls `RunSuite()`, collects the `SuiteResult`. Aggregates all suite results into the top-level wire format JSON. Returns the JSON string.
-
-- [ ] **3.2** Add `run_tests` to CommandDispatcher `[Slice 2]`
-  * File: `~/dev/ai-lab/MCP's/rbx-studio-mcp/plugin/src/CommandDispatcher.luau`
-  * Add `elseif toolName == "run_tests" then return TestRunner.runTests(commandArguments)` to the dispatch chain. The `commandArguments` shape: `{ paths: string[] }` where each path is a dot-separated DataModel path.
-
-- [ ] **3.3** Manual integration test `[Slice 2]`
-  * No file changes. Manual verification step.
-  * Write a minimal `.studio.ts` test (e.g., `Defcon1.studio.ts`), compile it, sync into Studio, then trigger `run_tests` via the MCP bridge. Confirm the JSON response matches the wire format spec.
+- [x] **3.1** Create TestRunner module in the plugin
+- [x] **3.2** Add `run_tests` to CommandDispatcher
+- [x] **3.3** Manual integration test
 
 ## Phase 4: MCP Server run_tests Tool (Rust)
 > Blocked by: Phase 3
 
-- [ ] **4.1** Add `RunTestsParameters` struct `[Slice 3]`
-  * File: `~/dev/ai-lab/MCP's/rbx-studio-mcp/src/mcp_parameters.rs` (or a new `mcp_parameters_test.rs`)
-  * Struct with one field: `paths: Vec<String>`. Each string is a DataModel path to a test ModuleScript. Derives `Deserialize` + `schemars::JsonSchema`. Follows the same pattern as `EchoParameters`, `GetChildrenParameters`, etc.
+- [x] **4.1** Add `RunTestsParameters` struct
+- [x] **4.2** Add `run_tests` tool to MCP server
 
-- [ ] **4.2** Add `run_studio_tests` tool to MCP server `[Slice 3]`
-  * File: `~/dev/ai-lab/MCP's/rbx-studio-mcp/src/mcp_server.rs`
-  * Add a `#[tool]` method `run_studio_tests` that takes `RunTestsParameters`, calls `self.dispatch_to_plugin("run_tests", json!({ "paths": parameters.paths }))`. Follows the exact same pattern as `echo`, `get_children`, etc. Tool description: "Execute Studio test suites and return structured results."
-
-## Phase 5: CLI Runner + Reporter (Node.js)
+## Phase 5: CLI Runner + Reporter
 > Blocked by: Phase 4
 
-- [ ] **5.1** Source path to DataModel path mapper `[Slice 3]`
-  * File: `scripts/studio-test-runner/path-mapper.mts`
-  * Takes a source path pattern (e.g., `Content/Traits`) and resolves matching `.studio.ts` files via glob. Maps each source path to a DataModel path using the Rojo tree structure: `src/Shared/ReplicatedStorage/Content/Traits/Defcon1/_Tests_/Defcon1.studio.ts` becomes `ReplicatedStorage.TS.Content.Traits.Defcon1._Tests_.Defcon1.studio`. References `build.project.json` mappings.
+- [x] **5.1** Bridge client and terminal reporter (Rust)
+- [x] **5.2** `oja-test` CLI bin in `@ojagamez/oja-test-kit`
+- [x] **5.3** Spinner while waiting for Studio response
+- [x] **5.4** `--tag` CLI flag for tag-based filtering
+- [x] **5.5** `--filter` CLI flag for path-based filtering
 
-- [ ] **5.2** HTTP client for MCP bridge `[Slice 3]`
-  * File: `scripts/studio-test-runner/bridge-client.mts`
-  * Sends the `run_tests` command to the MCP server. Two approaches: (a) call the MCP tool via the MCP protocol, or (b) POST directly to a new `/run-tests` HTTP endpoint. Option (b) is simpler for a standalone CLI. The client sends `{ paths: string[] }` and receives the JSON wire format result. Handles connection errors ("Studio not connected") with a clear message.
-
-- [ ] **5.3** Terminal reporter with colors `[Slice 3]`
-  * File: `scripts/studio-test-runner/reporter.mts`
-  * Takes the JSON wire format and prints Jest-style output. Green for pass, red for fail, yellow for skip. Shows suite names indented, individual test names with checkmarks/crosses and durations. Error details show expected vs received + Luau stack trace. Summary line: `Tests: N passed, N failed, N total`. Duration line: `Time: 0.847s`. Filter echo: `Pattern: Content/Traits/**`. Exit code 0 if all pass, 1 if any fail.
-
-- [ ] **5.4** CLI entry point + `pnpm test:studio` script `[Slice 3]`
-  * File: `scripts/studio-test-runner/index.mts`
-  * Parses CLI args: optional path pattern (default: all), `--watch` flag. Orchestrates: (1) run `pnpm compile:tests`, (2) glob for `.studio.ts` files matching pattern, (3) map to DataModel paths, (4) send to bridge, (5) format and print results, (6) exit with appropriate code.
-  * File: `package.json` (add scripts)
-  * `"test:studio": "tsx scripts/studio-test-runner/index.mts"`, `"test:studio:watch": "tsx scripts/studio-test-runner/index.mts --watch"`
-
-## Phase 6: Watch Mode + Migration
+## Phase 6: Polish + Watch Mode
 > Blocked by: Phase 5
 
-- [ ] **6.1** Add file watcher to CLI `[Slice 4]`
-  * File: `scripts/studio-test-runner/watcher.mts`
-  * Uses chokidar (or `fs.watch`) to watch `out/Shared/ReplicatedStorage/**/*.lua` for changes. On change, re-triggers the test execution pipeline (skip compile since watching compiled output). Debounce 300ms to avoid rapid re-runs.
-
-- [ ] **6.2** Wire `--watch` flag in CLI entry point `[Slice 4]`
-  * File: `scripts/studio-test-runner/index.mts` (modify)
-  * When `--watch` is passed: run tests once, then start the watcher. On each change, re-run the path mapping + bridge client + reporter cycle. Clear terminal between runs.
-
-- [ ] **6.3** Migrate Defcon1 trait test as proof of concept `[Slice 4]`
-  * File: `src/Shared/ReplicatedStorage/Content/Traits/Defcon1/_Tests_/Defcon1.studio.ts` (new)
-  * Rewrite `Defcon1.unit.ts` as `Defcon1.studio.ts` using the new framework's `describe`/`it`/`expect`. Same test logic, same DI container factory, but imports from `Infrastructure/TestFramework` instead of Jest globals. This proves the full migration path works end to end.
+- [ ] **6.1** oja-test config file support (NRO-103)
+- [ ] **6.2** Streaming per-suite results from plugin (NRO-104)
+- [ ] **6.3** Diff output for toEqual failures (NRO-105)
+- [ ] **6.4** File watcher + `--watch` flag
+- [ ] **6.5** Migrate remaining unit tests to studio tests
 
 ---
 
 ## Summary
 
-| Phase | Tasks | Type | Effort |
-|-------|-------|------|--------|
-| 1 | 4 | Build | Medium (core framework, ~200 lines TS) |
-| 2 | 3 | Config | Small (tsconfig + script + verify) |
-| 3 | 3 | Build + Integrate | Medium (Luau runner + dispatcher integration) |
-| 4 | 2 | Build + Integrate | Small (one Rust struct + one tool method) |
-| 5 | 4 | Build | Medium (Node.js CLI, ~150 lines across 4 files) |
-| 6 | 3 | Build | Small (watcher + one migration) |
-| **Total** | **19** | | |
+| Phase | Tasks | Status |
+|-------|-------|--------|
+| 1 | 6 | **DONE** |
+| 2 | 3 | **DONE** |
+| 3 | 3 | **DONE** |
+| 4 | 2 | **DONE** |
+| 5 | 5 | **DONE** |
+| 6 | 5 | **TODO** |
 
-### Playable Milestones
+### Milestones
 * After Phase 2: Tests compile and appear in Studio DataModel
 * After Phase 3: Tests run inside Studio and produce JSON results
-* After Phase 5: `pnpm test:studio` gives formatted terminal output
-* After Phase 6: `pnpm test:studio:watch` for live dev loop
+* After Phase 5: `pnpm test:studio` gives formatted terminal output with filtering
+* After Phase 6: `pnpm test:studio --watch` for live dev loop
+
+## Gotchas
+
+### init.luau vs index.luau (Rojo naming conflict)
+
+rbxtsc compiles `src/index.ts` to `out/init.luau`. Rojo treats `init.luau` as a directory entry point, making the `out/` folder a ModuleScript with no children. Consumer imports resolve to `TS.import(..., "out", "index")`, calling `WaitForChild("index")` which yields forever.
+
+Fix: build script runs `mv out/init.luau out/index.luau` and `sed` to rewrite `script` references to `script.Parent`. Without `init.luau`, Rojo treats `out/` as a Folder and syncs `index.luau` as a child.
+
+### Plugin command timeout
+
+`require()` in Luau yields when the target calls `WaitForChild()`. Main.server.luau wraps dispatch in `task.spawn()` with a 30-second timeout. If execution stalls, `task.cancel()` kills the thread and returns an error.
+
+### Bridge timeout
+
+Bridge dispatch timeout is 90 seconds. Keep this longer than the plugin's `COMMAND_TIMEOUT` so the bridge gets an error response instead of silently dropping the channel.
+
+### TestRunner must await Promises
+
+`RunSuites()` returns a Promise. TestRunner.luau detects Promises via `typeof(result.andThen) == "function"` and calls `:await()`. Without this, the runner tries to iterate Promise internals.
+
+### Luau require cache
+
+Luau caches `require()` per ModuleScript instance. TestRunner clones each test module before requiring, bypassing the cache. But dependencies of the test (like oja-test-kit modules) are NOT cloned, so their cache persists. If a dependency fails once, it stays broken until Studio restart.
+
+### pnpm hard links and Rojo file watching
+
+pnpm uses hard links from a content-addressable store. Rojo's file watcher may not detect hard link changes after rebuilding a dependency. Disconnect and reconnect Rojo if changes aren't picked up.
+
+### node_modules neutralization
+
+OjaTestKit's postinstall script writes `return nil` to `node_modules/init.luau` when installed as a dependency. This prevents Rojo from creating a `node_modules` Folder inside the package that would cause `TS.getModule` to find an empty scope and error.
 
 ## Work Log
 
-Append-only. Timestamped entries added as tasks are completed.
+- **2026-03-09** Phases 1-5 confirmed complete. CLI consolidated into `@ojagamez/oja-test-kit` as `oja-test` bin.
+- **2026-03-10** E2E pipeline validated. Documented gotchas from integration debugging. Key fixes: init-to-index rename, task.spawn async execution, Promise detection, serve subcommand, 90s bridge timeout.
+- **2026-03-10** NRO-102 (spinner), NRO-106 (tag filtering), NRO-107 (matchers) completed. Defcon1 trait test passing 6/6 in Studio. Plugin timeout reduced to 30s.

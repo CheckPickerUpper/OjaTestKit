@@ -23,14 +23,17 @@ The postinstall script downloads the `rbx-studio-mcp` bridge binary via `gh rele
 ### Running tests
 
 ```bash
-npx oja-test                     # run all tests
-npx oja-test --filter Defcon1    # run tests matching path
-npx oja-test --tag trait         # run only suites tagged "trait"
+npx oja-test                           # run all *.studio tests
+npx oja-test --filter Defcon1          # run tests matching path
+npx oja-test --tag trait               # run only suites tagged "trait"
+npx oja-test --pattern "*.spec"        # run *.spec tests instead of *.studio
 ```
 
 On first run, `oja-test` generates `tsconfig.studio-tests.json` if it doesn't exist. It compiles tests with `rbxtsc`, starts the bridge if needed, dispatches `run_tests` to Studio, and prints colored results.
 
 ### Writing tests
+
+By default, only ModuleScripts under `_Tests_` whose name ends with `.studio` are executed. Helper modules (like test doubles) in the same directories are ignored. Use `--pattern` to change the suffix convention.
 
 Create test files in `_Tests_` folders with the `.studio.ts` extension:
 

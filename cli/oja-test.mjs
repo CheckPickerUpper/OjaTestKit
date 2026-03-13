@@ -8,7 +8,11 @@ import { resolve, join } from "node:path";
 const args = process.argv.slice(2).filter((a) => a !== "--");
 const tagFlagIndex = args.indexOf("--tag");
 const tagFlag = tagFlagIndex >= 0 ? args[tagFlagIndex + 1] : undefined;
-const flagValues = new Set(tagFlag !== undefined ? [tagFlag] : []);
+const patternFlagIndex = args.indexOf("--pattern");
+const patternFlag = patternFlagIndex >= 0 ? args[patternFlagIndex + 1] : undefined;
+const flagValues = new Set(
+  [tagFlag, patternFlag].filter((v) => v !== undefined),
+);
 const filterFlag = args.find((a) => !a.startsWith("-") && !flagValues.has(a));
 const projectRoot = process.cwd();
 const BRIDGE_PORT = 9900;
@@ -109,10 +113,32 @@ async function ensureBridge() {
 function runTests() {
   const filterArgs = filterFlag ? ` --filter ${filterFlag}` : "";
   const tagArgs = tagFlag ? ` --tag ${tagFlag}` : "";
-  const cmd = `oja-test-runner${filterArgs}${tagArgs}`;
+  const patternArgs = patternFlag ? ` --pattern ${patternFlag}` : "";
+  const cmd = `oja-test-runner${filterArgs}${tagArgs}${patternArgs}`;
 
-  const result = spawnSync(cmd, { shell: true, stdio: "inherit", cwd: projectRoot });
-  process.exit(result.status ?? 1);
+  const testRunnerResult = spawnSync(cmd, {
+    shell: true,
+    stdio: ["inherit", "inherit", "pipe"],
+    cwd: projectRoot,
+  });
+
+  if (testRunnerResult.stderr && testRunnerResult.stderr.length > 0) {
+    const rawStderr = testRunnerResult.stderr.toString();
+    const filteredStderr = rawStderr
+      .split("\n")
+      .filter((line) => {
+        if (line.startsWith("Location:")) return false;
+        if (line.startsWith("   /")) return false;
+        if (line.includes("Backtrace omitted")) return false;
+        if (line.includes("RUST_BACKTRACE")) return false;
+        return true;
+      })
+      .join("\n")
+      .trimEnd();
+    if (filteredStderr) process.stderr.write(filteredStderr + "\n");
+  }
+
+  process.exit(testRunnerResult.status ?? 1);
 }
 
 ensureTsconfig();

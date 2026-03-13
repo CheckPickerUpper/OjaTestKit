@@ -1,37 +1,41 @@
 {
-	"name": "@ojagamez/oja-test-kit",
-	"version": "0.1.0",
-	"description": "Test framework for roblox-ts projects. Runs describe/it/expect inside Roblox Studio with structured JSON output.",
-	"main": "out/init.luau",
-	"types": "out/index.d.ts",
-	"bin": {
-		"oja-test": "cli/oja-test.mjs",
-		"oja-test-coverage": "cli/coverage.mjs"
-	},
-	"files": [
-		"out",
-		"cli"
-	],
-	"scripts": {
-		"build": "rbxtsc --type package",
-		"watch": "rbxtsc -w --type package",
-		"postinstall": "bash cli/install-mcp.sh"
-	},
-	"keywords": [
-		"roblox",
-		"roblox-ts",
-		"testing",
-		"studio"
-	],
-	"author": "OjaGamez",
-	"license": "MIT",
-	"devDependencies": {
-		"@rbxts/compiler-types": "^3.0.0-types.0",
-		"@rbxts/types": "^1.0.896",
-		"roblox-ts": "^3.0.0",
-		"typescript": "^5.9.3"
-	},
-	"peerDependencies": {
-		"@rbxts/services": "^1.6.0"
-	}
+  "name": "@ojagamez/oja-test-kit",
+  "version": "0.2.0",
+  "description": "Test framework for roblox-ts projects. Runs describe/it/expect inside Roblox Studio with structured JSON output.",
+  "main": "out/init.luau",
+  "types": "out/index.d.ts",
+  "bin": {
+    "oja-test": "cli/oja-test.mjs",
+    "oja-test-coverage": "cli/coverage.mjs"
+  },
+  "files": [
+    "out",
+    "cli"
+  ],
+  "scripts": {
+    "build": "rbxtsc --type package",
+    "watch": "rbxtsc -w --type package",
+    "postinstall": "bash cli/install-mcp.sh"
+  },
+  "keywords": [
+    "roblox",
+    "roblox-ts",
+    "testing",
+    "studio"
+  ],
+  "author": "OjaGamez",
+  "license": "MIT",
+  "devDependencies": {
+    "@rbxts/compiler-types": "^3.0.0-types.0",
+    "@rbxts/types": "^1.0.896",
+    "roblox-ts": "^3.0.0",
+    "typescript": "^5.9.3"
+  },
+  "peerDependencies": {
+    "@rbxts/services": "^1.6.0"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "restricted"
+  }
 }

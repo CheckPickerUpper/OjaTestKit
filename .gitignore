@@ -1,4 +1,7 @@
 node_modules/
 out/
 logs/
+.claude/DAIC_MODE.md
+.claude/kagemusha-state.json
+.claude/boomerangs/
 *.tsbuildinfo

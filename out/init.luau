@@ -14,4 +14,5 @@ exports.clearRegistry = _registry.clearRegistry
 local _runner = TS.import(script, script, "runner")
 exports.RunSuites = _runner.RunSuites
 exports.GetSandbox = _runner.GetSandbox
+exports.invalidateDescendantModules = TS.import(script, script, "dependencyCacheInvalidation").invalidateDescendantModules
 return exports

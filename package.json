@@ -1,6 +1,6 @@
 {
   "name": "@ojagamez/oja-test-kit",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Test framework for roblox-ts projects. Runs describe/it/expect inside Roblox Studio with structured JSON output.",
   "main": "out/init.luau",
   "types": "out/index.d.ts",

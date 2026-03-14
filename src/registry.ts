@@ -156,3 +156,13 @@ export function tag(...tags: string[]): void {
 		currentSuite.tags.push(label);
 	}
 }
+
+/**
+ * Wipes the suite registry without returning anything.
+ * Call before `require(testModule)` to discard stale registrations
+ * left behind by a previously-errored module that never reached RunSuites.
+ */
+export function clearRegistry(): void {
+	registeredSuites = [];
+	currentSuite = undefined;
+}

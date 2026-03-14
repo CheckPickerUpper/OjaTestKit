@@ -10,6 +10,7 @@ exports.afterAll = _registry.afterAll
 exports.beforeEach = _registry.beforeEach
 exports.afterEach = _registry.afterEach
 exports.tag = _registry.tag
+exports.clearRegistry = _registry.clearRegistry
 local _runner = TS.import(script, script, "runner")
 exports.RunSuites = _runner.RunSuites
 exports.GetSandbox = _runner.GetSandbox
